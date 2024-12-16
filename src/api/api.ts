@@ -1,8 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
-// Base URL of your Laravel API server
-const API_BASE_URL = 'http://127.0.0.1:8002/api';
+const API_BASE_URL = 'http://127.0.0.1:8001/api';
 
 const instance = axios.create({
   baseURL: API_BASE_URL,
@@ -11,16 +12,29 @@ const instance = axios.create({
   },
 });
 
-// Attach token from AsyncStorage as bearer token on every request
+// Attach token to every request
 instance.interceptors.request.use(
-  async config => {
+  async (config) => {
     const token = await AsyncStorage.getItem('token');
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  error => {
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Handle 401 Unauthorized responses
+instance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      const { logout } = useAuth();
+      await logout();
+      Alert.alert('Session Expired', 'Please log in again.');
+    }
     return Promise.reject(error);
   }
 );
